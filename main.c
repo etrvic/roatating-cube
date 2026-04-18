@@ -114,14 +114,25 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     double x = cube_pos[i][0];
     double y = cube_pos[i][1];
     double z = cube_pos[i][2];
-    double a = 1 * DEGREE_RAD;
-    double dx = cos(a) * x + sin(a) * z;
-    double dz = -sin(a) * x + cos(a) * z;
+    double a = 0.5 * DEGREE_RAD;
+    double dx, dy, dz;
+    dx = cos(a) * x + sin(a) * z;
+    dz = -sin(a) * x + cos(a) * z;
+    x = dx;
+    z = dz;
+    dx = cos(a) * x - sin(a) * y;
+    dy = sin(a) * x + cos(a) * y;
+    x = dx;
+    y = dy;
+    dy = cos(a) * y - sin(a) * z;
+    dz = sin(a) * y + cos(a) * z;
     cube_pos[i][0] = dx;
+    cube_pos[i][1] = dy;
     cube_pos[i][2] = dz;
   }
+  double z;
   for (i = 0; i < 8; i++) {
-    double z = cube_pos[i][2] / DISTANCE / 2 + 1.2;
+    z = cube_pos[i][2] / DISTANCE / 2 + 1.2;
     cube[i].x = cube_pos[i][0] / z;
     cube[i].y = cube_pos[i][1] / z;
   }
@@ -133,6 +144,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   SDL_RenderClear(renderer);                /* start with a blank canvas. */
   SDL_SetRenderDrawColor(renderer, 255, 255, 255,
                          SDL_ALPHA_OPAQUE); /* white, full alpha */
+  for (i = 0; i < 12; i++) {
+    int x1 = cube[bonds[i][0] - 1].x + window_w / 2;
+    int x2 = cube[bonds[i][1] - 1].x + window_w / 2;
+    int y1 = cube[bonds[i][0] - 1].y + window_h / 2;
+    int y2 = cube[bonds[i][1] - 1].y + window_h / 2;
+    SDL_RenderLine(renderer, x1, y1, x2, y2);
+  }
   for (i = 0; i < 12; i++) {
     int x1 = cube[bonds[i][0] - 1].x + window_w / 2;
     int x2 = cube[bonds[i][1] - 1].x + window_w / 2;
