@@ -40,6 +40,7 @@ int bonds[][2] = {{1, 2}, {1, 3}, {2, 4}, {3, 4}, {3, 7}, {4, 8},
                   {1, 5}, {2, 6}, {5, 6}, {5, 7}, {7, 8}, {6, 8}};
 
 SDL_FPoint cube[8];
+
 double cube_pos[8][3];
 
 void point_initialize(SDL_FPoint *points, float *points_speed, int size) {
