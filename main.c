@@ -10,49 +10,30 @@ static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 
+/* Initial window dimensions */
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
+
+/* Distance between two cube points that are part of the edge */
 #define DISTANCE 300
 #define DEGREE_RAD 0.01745
 
-#define NUM_POINTS 500
+/* framerate */
 #define MIN_PIXELS_PER_SECOND 30
 #define MAX_PIXELS_PER_SECOND 60
-static SDL_FPoint *points = NULL;
-static float *point_speeds = NULL;
-int p_size = 0;
-int c = 1000;
+
 int window_w = WINDOW_WIDTH;
 int window_h = WINDOW_HEIGHT;
-// clang-format off
-short map[] = {
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 1, 0, 0, 0, 0, 1,
-    1, 0, 1, 1, 0, 0, 1, 1,
-    1, 0, 0, 1, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 1, 0, 1,
-    1, 0, 0, 1, 1, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1
-};
-// clang-format on
+
+/* cube edges indexes (starting at 1) */
 int bonds[][2] = {{1, 2}, {1, 3}, {2, 4}, {3, 4}, {3, 7}, {4, 8},
                   {1, 5}, {2, 6}, {5, 6}, {5, 7}, {7, 8}, {6, 8}};
 
-SDL_FPoint cube[8];
-
+/* 3D coordonates for each point */
 double cube_pos[8][3];
 
-void point_initialize(SDL_FPoint *points, float *points_speed, int size) {
-  int i;
-  for (i = 0; i < size; i++) {
-    points[i].x = SDL_randf() * ((float)window_w);
-    points[i].y = SDL_randf() * ((float)window_h);
-    point_speeds[i] =
-        MIN_PIXELS_PER_SECOND +
-        (SDL_randf() * (MAX_PIXELS_PER_SECOND - MIN_PIXELS_PER_SECOND));
-  }
-}
+/* projected points onto the screen temporary array */
+SDL_FPoint cube[8];
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -70,25 +51,22 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   }
   SDL_SetRenderLogicalPresentation(renderer, window_w, window_h,
                                    SDL_LOGICAL_PRESENTATION_LETTERBOX);
+  SDL_SetRenderVSync(renderer, 1);
 
-  /* set up the data for a bunch of points. */
-  points = (SDL_FPoint *)malloc(sizeof(SDL_FPoint) * NUM_POINTS);
-  point_speeds = (float *)malloc(sizeof(float) * NUM_POINTS);
-  p_size = NUM_POINTS;
-  point_initialize(points, point_speeds, p_size);
+  /* set up all coordonates to Distance/2 */
   for (int j = 0; j < 8; j++) {
     cube_pos[j][1] = cube_pos[j][0] = cube_pos[j][2] = DISTANCE / 2;
   }
+
+  /* Set the other half to - Distance/2 */
   cube_pos[0][0] = cube_pos[2][0] = cube_pos[4][0] = cube_pos[6][0] =
       -DISTANCE / 2;
   cube_pos[2][1] = cube_pos[6][1] = cube_pos[3][1] = cube_pos[7][1] =
       -DISTANCE / 2;
-  cube_pos[0][2] = cube_pos[1][2] = cube_pos[2][2] = cube_pos[3][2] =
-      DISTANCE / 2;
   cube_pos[4][2] = cube_pos[5][2] = cube_pos[6][2] = cube_pos[7][2] =
       -DISTANCE / 2;
+
   last_time = SDL_GetTicks();
-  SDL_SetRenderVSync(renderer, 1);
   return SDL_APP_CONTINUE;
 }
 
@@ -97,6 +75,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   if (event->type == SDL_EVENT_QUIT) {
     return SDL_APP_SUCCESS;
   } else if (event->type == SDL_EVENT_WINDOW_RESIZED) {
+    /* If resized change the rendering size to the new screen size */
     window_w = event->window.data1;
     window_h = event->window.data2;
     SDL_SetRenderLogicalPresentation(renderer, window_w, window_h,
@@ -104,36 +83,45 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   }
   return SDL_APP_CONTINUE;
 }
-double dz = 0;
+
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate) {
+
   const Uint64 now = SDL_GetTicks();
   const float elapsed =
       ((float)(now - last_time)) / 1000.0f; /* seconds since last iteration */
+
   int i;
   for (i = 0; i < 8; i++) {
     double x = cube_pos[i][0];
     double y = cube_pos[i][1];
     double z = cube_pos[i][2];
+    /* angle to rotate each frame the cube by */
     double a = 0.5 * DEGREE_RAD;
     double dx, dy, dz;
+    /* oy Roation */
     dx = cos(a) * x + sin(a) * z;
     dz = -sin(a) * x + cos(a) * z;
     x = dx;
     z = dz;
+    /* oz Roation */
     dx = cos(a) * x - sin(a) * y;
     dy = sin(a) * x + cos(a) * y;
     x = dx;
     y = dy;
+    /* ox Roation */
     dy = cos(a) * y - sin(a) * z;
     dz = sin(a) * y + cos(a) * z;
     cube_pos[i][0] = dx;
     cube_pos[i][1] = dy;
     cube_pos[i][2] = dz;
   }
-  double z;
+
   for (i = 0; i < 8; i++) {
-    z = cube_pos[i][2] / DISTANCE / 2 + 1.2;
+    /* Normalize the x coordonate to Distance Over 2
+     * and add 1.2 since that would be the screen
+     * TODO make a more robust way to transform Z to a smaller number */
+    double z = cube_pos[i][2] / DISTANCE / 2 + 1.2;
     cube[i].x = cube_pos[i][0] / z;
     cube[i].y = cube_pos[i][1] / z;
   }
@@ -145,6 +133,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   SDL_RenderClear(renderer);                /* start with a blank canvas. */
   SDL_SetRenderDrawColor(renderer, 255, 255, 255,
                          SDL_ALPHA_OPAQUE); /* white, full alpha */
+  /*  Before rendering we have to move the points to the SDL coordonate system
+   */
   for (i = 0; i < 12; i++) {
     int x1 = cube[bonds[i][0] - 1].x + window_w / 2;
     int x2 = cube[bonds[i][1] - 1].x + window_w / 2;
@@ -152,15 +142,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     int y2 = cube[bonds[i][1] - 1].y + window_h / 2;
     SDL_RenderLine(renderer, x1, y1, x2, y2);
   }
-  for (i = 0; i < 12; i++) {
-    int x1 = cube[bonds[i][0] - 1].x + window_w / 2;
-    int x2 = cube[bonds[i][1] - 1].x + window_w / 2;
-    int y1 = cube[bonds[i][0] - 1].y + window_h / 2;
-    int y2 = cube[bonds[i][1] - 1].y + window_h / 2;
-    SDL_RenderLine(renderer, x1, y1, x2, y2);
-  }
-  /* You can also draw single points with SDL_RenderPoint(), but it's
-     cheaper (sometimes significantly so) to do them all at once. */
 
   SDL_RenderPresent(renderer); /* put it all on the screen */
 
